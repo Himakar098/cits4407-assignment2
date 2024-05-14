@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Function to process individual files
+process_file() {
+    local file=$1
+    # Get the header line and number of expected fields (minus 'Continent' column)
+    local header=$(head -n 1 "$file")
+    local num_fields=$(echo "$header" | awk -F'\t' '{print NF}')
+    local continent_index=$(echo "$header" | tr '\t' '\n' | nl -n ln | grep -i continent | cut -f 1)
+    if [ ! -z "$continent_index" ]; then
+        num_fields=$((num_fields-1))
+    fi
+
+    # Process the file
+    awk -F'\t' -v num_fields="$num_fields" -v continent_index="$continent_index" '
+    BEGIN { OFS=FS }
+    NR == 1 {
+        # Print header without 'Continent' and adjusted field names
+        for (i = 1; i <= NF; i++) {
+            if (i != continent_index) {
+                printf("%s\t", $i);
+            }
+        }
+        printf("\n");
+    }
+    NR > 1 {
+        # Skip lines with missing country code or incorrect number of fields
+        if ($2 != "" && NF == num_fields + (continent_index != 0 ? 1 : 0)) {
+            # Remove 'Continent' column if it exists
+            for (i = 1; i <= NF; i++) {
+                if (i != continent_index) {
+                    printf("%s\t", $i);
+                }
+            }
+            printf("\n");
+        }
+    }' "$file"
+}
+
+# Main logic to handle multiple files
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 <file1.tsv> <file2.tsv> <file3.tsv>"
+    exit 1
+fi
+
+# Temporary files for intermediate data
+tmp1=$(mktemp)
+tmp2=$(mktemp)
+tmp3=$(mktemp)
+
+# Process each file
+process_file "$1" > "$tmp1"
+process_file "$2" > "$tmp2"
+process_file "$3" > "$tmp3"
+
+# Sort files by Entity and Year for joining
+sort -k1,1 -k3,3n "$tmp1" > "$tmp1.sorted"
+sort -k1,1 -k3,3n "$tmp2" > "$tmp2.sorted"
+sort -k1,1 -k3,3n "$tmp3" > "$tmp3.sorted"
+
+# Join the sorted files on Entity and Year columns
+join -t $'\t' -1 1 -2 1 -o auto "$tmp1.sorted" "$tmp2.sorted" | join -t $'\t' -1 1 -2 1 -o auto - "$tmp3.sorted"
+
+# Clean up temporary files
+rm "$tmp1" "$tmp2" "$tmp3" "$tmp1.sorted" "$tmp2.sorted" "$tmp3.sorted"

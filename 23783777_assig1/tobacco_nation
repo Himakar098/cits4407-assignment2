@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Check if the correct number of arguments is provided
+if [ "$#" -ne 3 ]; then
+    echo "Usage: tobacco_nation <csv data file>  <year | country code>  <Male | Female>" >&2
+    exit 1
+fi
+
+# Check if the provided CSV file exists
+if [ ! -f "$1" ]; then
+    echo "The named input file $1 does not exist or has zero length" >&2
+    exit 1
+fi
+
+# Function to process data from the CSV file
+tobacco_nation_process_data() {
+    local data_file="$1"
+    local year_country_identifier="$2"
+    local gender="$3"
+    local max_rate=0
+    local find_country=""
+    local find_country_code=""
+    local find_year=""
+
+    # Loop through each line in the CSV file
+    while IFS=',' read -r RegionCode Region CountryCode Country year Gender_FMB medianPC PC_Range; do
+        if [[ "$year" == "$year_country_identifier" && "$Gender_FMB" == "$gender" && $(bc <<< "$medianPC > $max_rate") -eq 1 ]]; then
+            max_rate="$medianPC"
+            find_country_code="$CountryCode"
+            find_country="$Country"
+            find_year="$year"
+        elif [[ "$CountryCode" == "$year_country_identifier" && "$Gender_FMB" == "$gender" && $(bc <<< "$medianPC > $max_rate") -eq 1  ]]; then
+            max_rate="$medianPC"
+            find_country="$Country"
+            find_year="$year"
+        fi
+    done < "$data_file"
+
+    # Display results based on the data found
+    if [ -n "$find_country_code" ]; then
+        if [ "$year_country_identifier" -gt 2024 ]; then
+            echo "The global maximum percentage of $gender tobacco users in $year_country_identifier is predicted to be in $find_country ($find_country_code) at $max_rate"
+        else
+            echo "The global maximum percentage of $gender tobacco users in $year_country_identifier was in $find_country ($find_country_code) at $max_rate"
+        fi
+    elif [ -n "$find_year" ]; then
+        echo "The global maximum percentage of tobacco users for $find_country ($year_country_identifier) was $max_rate in $find_year"
+    else
+        echo "No data found for the specified country code or year."
+    fi
+}
+
+# Determine if the second argument is a year or a country code
+if [[ "$2" =~ ^[0-9]+$ ]]; then
+    tobacco_nation_process_data "$1" "$2" "$3"
+else
+    process_data "$1" "$2" "$3"
+fi
+

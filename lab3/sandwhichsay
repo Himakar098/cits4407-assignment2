@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Function to print sandwich with input string and optional bread appearance
+sandwichsay() {
+    input="$1"  # Get input string
+    bread="[============================]"  # Set default bread appearance
+
+    # Check if a second command-line argument is provided for bread appearance
+    if [ "$#" -eq 2 ]; then
+        bread="$2"  # Override default bread appearance if provided
+    fi
+
+    # Print top slice of bread
+    printf '%s\n' "$bread"
+
+    # Print input string centered between bread slices
+    printf '%s\n' "$input"
+
+    # Print bottom slice of bread
+    printf '%s\n' "$bread"
+}
+
+# Call sandwichsay function with input argument(s)
+sandwichsay "$@"
