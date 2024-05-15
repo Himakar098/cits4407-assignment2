@@ -19,11 +19,11 @@ check_tab_separated() {
 # Function to identify the type of the file based on headers
 identify_file_type() {
     header=$(head -n 1 "$1")
-    if [[ "$header" == *"GDP"* ]]; then
+    if [[ "$header" == *"GDP per capita, PPP (constant 2017 international \$)"* ]]; then
         echo "gdp"
-    elif [[ "$header" == *"Homicide"* ]]; then
+    elif [[ "$header" == *"Homicide rate per 100,000 population - Both sexes - All ages"* ]]; then
         echo "homicide"
-    elif [[ "$header" == *"Life satisfaction"* ]]; then
+    elif [[ "$header" == *"Life expectancy - Sex: all - Age: at birth - Variant: estimates"* ]]; then
         echo "life_satisfaction"
     else
         echo "Error: Unrecognized file format in '$1'." >&2
@@ -61,7 +61,7 @@ process_file() {
         }
         print header_line
     }
-    NR > 1 && $2 >= 2011 && $2 <= 2021 {
+    NR > 1 && $2 >= 2011 && $2 <= 2021 && $1 != "" {
         line = ""
         for (i = 1; i <= NF; i++) {
             if (col[i]) {
@@ -128,15 +128,24 @@ process_file "$gdp_file" > "$cleaned_gdp_file"
 process_file "$homicide_file" > "$cleaned_homicide_file"
 process_file "$life_satisfaction_file" > "$cleaned_life_satisfaction_file"
 
+# Check temporary files
+echo "Cleaned GDP file:"
+cat "$cleaned_gdp_file"
+echo "Cleaned Homicide file:"
+cat "$cleaned_homicide_file"
+echo "Cleaned Life Satisfaction file:"
+cat "$cleaned_life_satisfaction_file"
+
 # Combine and clean data
+output_file="combined_output.tsv"
 awk -F'\t' 'BEGIN {
     OFS = "\t"
-    print "Country", "Year", "GDP per capita", "Population", "Homicide Rate", "Life Expectancy", "Cantril Ladder score"
+    print "Entity/Country", "Code", "Year", "GDP per capita", "Population", "Homicide Rate", "Life Expectancy", "Cantril Ladder score"
 }
 NR == FNR {
     if (NR > 1) {
-        gdp[$2][$3] = $4
-        population[$2][$3] = $5
+        gdp[$2][$3] = $5
+        population[$2][$3] = $6
         cantril[$2][$3] = $4
     }
     next
@@ -149,16 +158,21 @@ FNR == NR && NR != FNR {
 }
 FNR != NR {
     if (FNR > 1) {
-        country = $2
+        country = $1
+        code = $2
         year = $3
-        gdp_value = (country in gdp && year in gdp[country]) ? gdp[country][year] : "NA"
-        population_value = (country in population && year in population[country]) ? population[country][year] : "NA"
-        homicide_value = (country in homicide && year in homicide[country]) ? homicide[country][year] : "NA"
-        life_expectancy_value = (country in cantril && year in cantril[country]) ? cantril[country][year] : "NA"
-        cantril_value = (country in cantril && year in cantril[country]) ? cantril[country][year] : "NA"
-        print country, year, gdp_value, population_value, homicide_value, life_expectancy_value, cantril_value
+        gdp_value = (code in gdp && year in gdp[code]) ? gdp[code][year] : "NA"
+        population_value = (code in population && year in population[code]) ? population[code][year] : "NA"
+        homicide_value = (code in homicide && year in homicide[code]) ? homicide[code][year] : "NA"
+        life_expectancy_value = (code in cantril && year in cantril[code]) ? cantril[code][year] : "NA"
+        cantril_value = (code in cantril && year in cantril[code]) ? cantril[code][year] : "NA"
+        print country, code, year, gdp_value, population_value, homicide_value, life_expectancy_value, cantril_value
     }
-}' "$cleaned_gdp_file" "$cleaned_homicide_file" "$cleaned_life_satisfaction_file"
+}' "$cleaned_gdp_file" "$cleaned_homicide_file" "$cleaned_life_satisfaction_file" > "$output_file"
+
+# Check combined output
+echo "Combined Output File:"
+cat "$output_file"
 
 # Clean up temporary files
 rm "$cleaned_gdp_file" "$cleaned_homicide_file" "$cleaned_life_satisfaction_file"
